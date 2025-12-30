@@ -8,11 +8,7 @@
         android:icon="@drawable/ic_swap_vert"
         app:showAsAction="ifRoom" />
 
-    <item
-        android:id="@+id/action_share_game"
-        android:title="Share"
-        android:icon="@drawable/ic_share"
-        app:showAsAction="ifRoom" />
+
 
     <item
         android:id="@+id/action_save_game"
