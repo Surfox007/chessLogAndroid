@@ -23,6 +23,7 @@ public class ChessboardView extends View {
     private Paint piecePaint;
     private int squareSize;
     private Board board; // chesslib Board object
+    private boolean isFlipped = false; // Added: isFlipped flag
 
     private Map<Piece, String> pieceUnicodeMap;
 
@@ -93,8 +94,14 @@ public class ChessboardView extends View {
                 }
 
                 // Draw pieces
-                int rank = 7 - row; // Invert row to match chesslib's rank (rank 1 is bottom, rank 8 is top)
-                int file = col;
+                int rank, file; // Modified: account for isFlipped
+                if (isFlipped) {
+                    rank = row;
+                    file = 7 - col;
+                } else {
+                    rank = 7 - row;
+                    file = col;
+                }
                 Square square = Square.squareAt(rank * 8 + file);
                 Piece piece = board.getPiece(square);
 
@@ -120,5 +127,11 @@ public class ChessboardView extends View {
     public void setBoard(Board board) {
         this.board = board;
         invalidate(); // Redraw the board
+    }
+
+    // Added: flip() method
+    public void flip() {
+        isFlipped = !isFlipped;
+        invalidate();
     }
 }

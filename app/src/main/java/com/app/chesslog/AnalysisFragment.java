@@ -45,8 +45,7 @@ public class AnalysisFragment extends Fragment {
             if (chessGame != null) {
                 binding.whitePlayerNameLabel.setText("⚪ " + chessGame.whitePlayer);
                 binding.blackPlayerNameLabel.setText("⚫ " + chessGame.blackPlayer);
-                binding.pgnTextView.setText(chessGame.pgn);
-                binding.engineAnalysisTextView.setText("Engine Analysis: Initializing...");
+                binding.stockfishAnalysisPlaceholder.setText("Stockfish analysis will be displayed here.");
 
                 try {
                     PgnHolder pgn = new PgnHolder(null);
@@ -54,6 +53,17 @@ public class AnalysisFragment extends Fragment {
                     if (!pgn.getGames().isEmpty()) {
                         game = pgn.getGames().get(0);
                         game.loadMoveText();
+
+                        StringBuilder movesText = new StringBuilder();
+                        MoveList moves = game.getHalfMoves();
+                        for (int i = 0; i < moves.size(); i++) {
+                            if (i % 2 == 0) { // White's move
+                                movesText.append((i / 2) + 1).append(". ");
+                            }
+                            movesText.append(moves.get(i).toString()).append(" ");
+                        }
+                        binding.movesTextView.setText(movesText.toString().trim());
+
                         board = new Board(); // Reset board to initial state
                         currentMoveIndex = 0; // Reset move index
                         binding.boardView.setBoard(board); // Set initial board
@@ -64,13 +74,14 @@ public class AnalysisFragment extends Fragment {
             }
         });
 
+        // New Navigation Listeners
         binding.forwardMoveButton.setOnClickListener(v -> {
             if (board != null && game != null) {
                 MoveList moves = game.getHalfMoves();
                 if (currentMoveIndex < moves.size()) {
                     board.doMove(moves.get(currentMoveIndex));
                     currentMoveIndex++;
-                    binding.boardView.setBoard(board); // Update board view
+                    binding.boardView.setBoard(board);
                 }
             }
         });
@@ -79,16 +90,56 @@ public class AnalysisFragment extends Fragment {
             if (board != null && currentMoveIndex > 0) {
                 board.undoMove();
                 currentMoveIndex--;
-                binding.boardView.setBoard(board); // Update board view
+                binding.boardView.setBoard(board);
             }
         });
 
-        binding.saveGameButton.setOnClickListener(v -> {
-            ChessGame selectedGame = viewModel.getSelectedGame().getValue();
-            if (selectedGame != null) {
-                viewModel.insertGame(selectedGame);
-                Toast.makeText(getContext(), "Game saved!", Toast.LENGTH_SHORT).show();
+        binding.skipNextButton.setOnClickListener(v -> {
+            if (board != null && game != null) {
+                MoveList moves = game.getHalfMoves();
+                while (currentMoveIndex < moves.size()) {
+                    board.doMove(moves.get(currentMoveIndex));
+                    currentMoveIndex++;
+                }
+                binding.boardView.setBoard(board);
             }
+        });
+
+        binding.skipPreviousButton.setOnClickListener(v -> {
+            if (board != null) {
+                while (currentMoveIndex > 0) {
+                    board.undoMove();
+                    currentMoveIndex--;
+                }
+                binding.boardView.setBoard(board);
+            }
+        });
+
+
+        // Toolbar Menu Listener
+        binding.toolbar.setOnMenuItemClickListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.action_flip_board) {
+                binding.boardView.flip();
+                return true;
+            } else if (itemId == R.id.action_share_game) {
+                ChessGame selectedGame = viewModel.getSelectedGame().getValue();
+                if (selectedGame != null && selectedGame.pgn != null) {
+                    android.content.Intent shareIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+                    shareIntent.setType("text/plain");
+                    shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, selectedGame.pgn);
+                    startActivity(android.content.Intent.createChooser(shareIntent, "Share Game PGN"));
+                }
+                return true;
+            } else if (itemId == R.id.action_save_game) {
+                ChessGame selectedGame = viewModel.getSelectedGame().getValue();
+                if (selectedGame != null) {
+                    viewModel.insertGame(selectedGame);
+                    Toast.makeText(getContext(), "Game saved!", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            }
+            return false;
         });
     }
 }
