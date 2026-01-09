@@ -19,9 +19,12 @@
         android:id="@+id/stockfish_analysis_placeholder"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:background="#E0E0E0"
-        android:padding="8dp"
-        android:text="Stockfish analysis will be displayed here."
+        android:background="#EEEEEE"
+        android:padding="12dp"
+        android:textSize="14sp"
+        android:fontFamily="monospace"
+        android:textColor="#222222"
+        android:minLines="1"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/toolbar" />
@@ -30,7 +33,7 @@
         android:id="@+id/blackPlayerNameLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
         android:text="⚫ [Black Player]"
         android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -44,15 +47,13 @@
         app:layout_constraintDimensionRatio="1:1"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/blackPlayerNameLabel"
-        app:layout_constraintBottom_toTopOf="@id/whitePlayerNameLabel"
-        app:layout_constraintHeight_percent="0.6" />
+        app:layout_constraintTop_toBottomOf="@id/blackPlayerNameLabel" />
 
     <TextView
         android:id="@+id/whitePlayerNameLabel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
         android:text="⚪ [White Player]"
         android:textSize="16sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -76,8 +77,10 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="?attr/colorSurface"
+        android:elevation="8dp"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <com.google.android.material.button.MaterialButton

@@ -9,10 +9,13 @@ import com.app.chesslog.data.AppDatabase;
 import com.app.chesslog.data.ChessGame;
 import com.app.chesslog.data.GameDao;
 import com.app.chesslog.data.remote.ChessApiService;
+import com.app.chesslog.data.remote.StockfishApiService;
 import com.app.chesslog.data.remote.RetrofitClient;
 import com.app.chesslog.data.remote.model.Archives;
 import com.app.chesslog.data.remote.model.Game;
 import com.app.chesslog.data.remote.model.Games;
+import com.app.chesslog.data.remote.model.StockfishResponse;
+import java.io.IOException; // Added for UCIEngine
 import java.util.ArrayList;
 import java.util.List;
 import retrofit2.Call;
@@ -26,6 +29,13 @@ public class MainViewModel extends AndroidViewModel {
     private final SingleLiveEvent<List<ChessGame>> importedGames = new SingleLiveEvent<>();
     private final MutableLiveData<ChessGame> selectedGame = new MutableLiveData<>();
     private final ChessApiService chessApiService;
+    private final StockfishApiService stockfishApiService;
+
+    // Stockfish integration
+    private UCIEngine uciEngine;
+    private final MutableLiveData<String> engineAnalysis = new MutableLiveData<>();
+    private final MutableLiveData<List<String>> engineMoveList = new MutableLiveData<>();
+    private final MutableLiveData<Boolean> isEngineEnabled = new MutableLiveData<>(false);
 
     public MainViewModel(Application application) {
         super(application);
@@ -33,6 +43,11 @@ public class MainViewModel extends AndroidViewModel {
         gameDao = db.gameDao();
         savedGames = gameDao.getAllGames();
         chessApiService = RetrofitClient.getClient("https://api.chess.com/").create(ChessApiService.class);
+        stockfishApiService = RetrofitClient.getClient("https://stockfish.online/").create(StockfishApiService.class);
+    }
+
+    public LiveData<List<String>> getEngineMoveList() {
+        return engineMoveList;
     }
 
     public LiveData<List<ChessGame>> getSavedGames() {
@@ -49,6 +64,116 @@ public class MainViewModel extends AndroidViewModel {
 
     public void setSelectedGame(ChessGame game) {
         selectedGame.setValue(game);
+    }
+
+    // Stockfish integration getters/setters/methods
+    public LiveData<String> getEngineAnalysis() {
+        return engineAnalysis;
+    }
+
+    public LiveData<Boolean> isEngineEnabled() {
+        return isEngineEnabled;
+    }
+
+    public void toggleEngine() {
+        boolean newState = Boolean.FALSE.equals(isEngineEnabled.getValue());
+        isEngineEnabled.setValue(newState);
+        if (!newState) {
+            engineAnalysis.postValue("");
+        }
+    }
+
+    public void startEngine(String enginePath) {
+        if (uciEngine == null) {
+            uciEngine = new UCIEngine();
+            uciEngine.setOnBestMoveListener(bestMove -> {
+                Log.d(TAG, "Best Move received: " + bestMove);
+                // Parse bestMove (e.g., "bestmove e2e4 ponder e7e5") to show only the move
+                String parsedMove = bestMove.replace("bestmove ", "").split(" ")[0];
+                engineAnalysis.postValue("Best Move: " + parsedMove);
+            });
+            uciEngine.setOnInfoListener(info -> Log.d(TAG, "Engine Info: " + info));
+            uciEngine.setOnErrorListener(error -> {
+                Log.e(TAG, "Engine Error: " + error);
+                engineAnalysis.postValue("Engine Error: " + error);
+            });
+            try {
+                uciEngine.start(enginePath);
+            } catch (IOException e) {
+                Log.e(TAG, "Failed to start UCI Engine", e);
+                engineAnalysis.postValue("Engine startup failed: " + e.getMessage());
+                uciEngine = null; // Discard broken engine instance
+            }
+        }
+    }
+
+    public void analyzeCurrentPosition(String fen) {
+        if (Boolean.FALSE.equals(isEngineEnabled.getValue())) {
+            engineAnalysis.postValue("");
+            return;
+        }
+
+        // Try online API first as per user's request for "Online API Approach"
+        analyzePositionOnline(fen);
+
+        // If you still want to use the local engine as a fallback or in parallel:
+        /*
+        if (uciEngine != null) {
+            AppDatabase.databaseWriteExecutor.execute(() -> {
+                try {
+                    uciEngine.sendCommand("ucinewgame");
+                    uciEngine.sendCommand("isready");
+                    uciEngine.sendCommand("position fen " + fen);
+                    uciEngine.sendCommand("go movetime 1000");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error analyzing position locally: " + e.getMessage());
+                }
+            });
+        }
+        */
+    }
+
+    private void analyzePositionOnline(String fen) {
+        stockfishApiService.getBestMove(fen, 10, "bestmove").enqueue(new Callback<StockfishResponse>() {
+            @Override
+            public void onResponse(Call<StockfishResponse> call, Response<StockfishResponse> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    StockfishResponse stockfishResponse = response.body();
+                    if (stockfishResponse.isSuccess()) {
+                        String evaluation = stockfishResponse.getEvaluation() != null ? 
+                                String.format("%s%.2f", stockfishResponse.getEvaluation() > 0 ? "+" : "", stockfishResponse.getEvaluation()) : 
+                                (stockfishResponse.getMate() != null ? "#" + stockfishResponse.getMate() : "0.00");
+                        
+                        String continuation = stockfishResponse.getContinuation() != null ? stockfishResponse.getContinuation() : "";
+                        String analysis = evaluation + "  " + continuation;
+                        engineAnalysis.postValue(analysis.trim());
+
+                        if (stockfishResponse.getContinuation() != null) {
+                            List<String> moves = java.util.Arrays.asList(stockfishResponse.getContinuation().split(" "));
+                            engineMoveList.postValue(moves);
+                        }
+                    } else {
+                        engineAnalysis.postValue("API Error: " + stockfishResponse.getData());
+                    }
+                } else {
+                    engineAnalysis.postValue("API Call failed: " + response.code());
+                }
+            }
+
+            @Override
+            public void onFailure(Call<StockfishResponse> call, Throwable t) {
+                Log.e(TAG, "Failed to analyze position online", t);
+                engineAnalysis.postValue("Network Error: " + t.getMessage());
+            }
+        });
+    }
+
+    @Override
+    protected void onCleared() {
+        super.onCleared();
+        if (uciEngine != null) {
+            uciEngine.stop();
+        }
     }
 
     public void fetchGames(String username) {

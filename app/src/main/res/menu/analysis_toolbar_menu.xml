@@ -3,6 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_toggle_engine"
+        android:title="Toggle Engine"
+        android:icon="@drawable/ic_power_settings"
+        app:showAsAction="ifRoom"
+        android:checkable="true" />
+
+    <item
         android:id="@+id/action_flip_board"
         android:title="Flip Board"
         android:icon="@drawable/ic_swap_vert"

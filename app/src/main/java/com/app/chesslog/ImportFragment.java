@@ -12,7 +12,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import com.app.chesslog.data.ChessGame;
 import com.app.chesslog.databinding.FragmentImportBinding;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 import java.util.ArrayList;
 
 public class ImportFragment extends Fragment implements GameListAdapter.OnItemClickListener {
@@ -65,15 +64,17 @@ public class ImportFragment extends Fragment implements GameListAdapter.OnItemCl
     public void onItemClick(ChessGame game) {
         viewModel.insertGame(game);
         viewModel.setSelectedGame(game);
-        BottomNavigationView bottomNavigationView = requireActivity().findViewById(R.id.bottom_navigation);
-        bottomNavigationView.setSelectedItemId(R.id.navigation_analysis);
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).navigateTo(R.id.navigation_analysis);
+        }
     }
 
     @Override
     public void onLoadClick(ChessGame game) {
         viewModel.setSelectedGame(game);
-        BottomNavigationView bottomNavigationView = requireActivity().findViewById(R.id.bottom_navigation);
-        bottomNavigationView.setSelectedItemId(R.id.navigation_analysis);
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).navigateTo(R.id.navigation_analysis);
+        }
     }
 
     @Override
