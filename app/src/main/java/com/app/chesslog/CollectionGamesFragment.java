@@ -34,6 +34,13 @@ public class CollectionGamesFragment extends Fragment implements GameListAdapter
         binding.gamesRecyclerView.setLayoutManager(new LinearLayoutManager(getActivity()));
         binding.gamesRecyclerView.setAdapter(adapter);
 
+        binding.addGameFab.setOnClickListener(v -> {
+            viewModel.setSelectedGame(null);
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).navigateTo(R.id.navigation_analysis);
+            }
+        });
+
         viewModel.getSavedGames().observe(getViewLifecycleOwner(), games -> {
             if (games != null) {
                 adapter.submitList(games);

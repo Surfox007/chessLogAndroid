@@ -3,6 +3,9 @@ package com.app.chesslog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.app.AlertDialog;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.BackgroundColorSpan;
@@ -85,6 +88,34 @@ public class AnalysisFragment extends Fragment {
 
         setupRecyclerView();
 
+        // Setup board move listener
+        binding.boardView.setOnMoveListener(move -> {
+            if (game == null || board == null) return;
+
+            try {
+                // Check legality using the board
+                if (board.doMove(move)) {
+                    // If we are not at the end of the game, truncate the future moves
+                    if (currentMoveIndex < game.getHalfMoves().size() - 1) {
+                         // Remove moves from currentMoveIndex + 1 to end
+                         int movesToKeep = currentMoveIndex + 1;
+                         MoveList moves = game.getHalfMoves();
+                         while (moves.size() > movesToKeep) {
+                             moves.remove(moves.size() - 1);
+                         }
+                    }
+                    
+                    game.getHalfMoves().add(move);
+                    moveListAdapter.setMoves(game.getHalfMoves());
+                    updateBoardPosition(game.getHalfMoves().size());
+                } else {
+                    Toast.makeText(getContext(), "Illegal move", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(getContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+
         viewModel.getSelectedGame().observe(getViewLifecycleOwner(), chessGame -> {
             if (chessGame != null) {
                 binding.whitePlayerNameLabel.setText("⚪ " + chessGame.whitePlayer);
@@ -106,11 +137,43 @@ public class AnalysisFragment extends Fragment {
                     e.printStackTrace();
                     binding.stockfishAnalysisPlaceholder.setText("Error loading game: " + e.getMessage());
                 }
+            } else {
+                setupNewGame();
             }
         });
 
         setupNavigationListeners();
         setupToolbarListener();
+    }
+
+    private void setupNewGame() {
+        try {
+            PgnHolder pgn = new PgnHolder(null);
+            String pgnString = "[Event \"Casual Game\"]\n" +
+                               "[Site \"Local\"]\n" +
+                               "[Date \"" + new java.text.SimpleDateFormat("yyyy.MM.dd", java.util.Locale.US).format(new java.util.Date()) + "\"]\n" +
+                               "[Round \"1\"]\n" +
+                               "[White \"White\"]\n" +
+                               "[Black \"Black\"]\n" +
+                               "[Result \"*\"]\n";
+            pgn.loadPgn(pgnString);
+            if (pgn.getGames().size() > 0) {
+                game = pgn.getGames().get(0);
+                game.loadMoveText();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        board = new Board();
+        
+        binding.whitePlayerNameLabel.setText("⚪ White");
+        binding.blackPlayerNameLabel.setText("⚫ Black");
+        
+        if (game != null) {
+            moveListAdapter.setMoves(game.getHalfMoves());
+        }
+        updateBoardPosition(0);
     }
 
     private void setupRecyclerView() {
@@ -158,9 +221,21 @@ public class AnalysisFragment extends Fragment {
             } else if (itemId == R.id.action_flip_board) {
                 binding.boardView.flip();
                 return true;
+            } else if (itemId == R.id.action_edit_game_info) {
+                showEditGameInfoDialog();
+                return true;
             } else if (itemId == R.id.action_save_game) {
                 ChessGame selectedGame = viewModel.getSelectedGame().getValue();
-                if (selectedGame != null) {
+                if (selectedGame == null) {
+                    selectedGame = new ChessGame();
+                    selectedGame.url = java.util.UUID.randomUUID().toString(); // Generate unique ID for local game
+                    selectedGame.whitePlayer = "White";
+                    selectedGame.blackPlayer = "Black";
+                    viewModel.setSelectedGame(selectedGame);
+                }
+                
+                if (game != null) {
+                    selectedGame.pgn = game.toPgn(true, true);
                     viewModel.insertGame(selectedGame);
                     Toast.makeText(getContext(), "Game saved!", Toast.LENGTH_SHORT).show();
                 }
@@ -168,6 +243,71 @@ public class AnalysisFragment extends Fragment {
             }
             return false;
         });
+    }
+
+    private void showEditGameInfoDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Edit Game Info");
+
+        LinearLayout layout = new LinearLayout(getContext());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(32, 32, 32, 32);
+
+        final EditText whitePlayerInput = new EditText(getContext());
+        whitePlayerInput.setHint("White Player Name");
+        if (viewModel.getSelectedGame().getValue() != null) {
+            whitePlayerInput.setText(viewModel.getSelectedGame().getValue().whitePlayer);
+        } else {
+            whitePlayerInput.setText("White");
+        }
+        layout.addView(whitePlayerInput);
+
+        final EditText blackPlayerInput = new EditText(getContext());
+        blackPlayerInput.setHint("Black Player Name");
+        if (viewModel.getSelectedGame().getValue() != null) {
+            blackPlayerInput.setText(viewModel.getSelectedGame().getValue().blackPlayer);
+        } else {
+             blackPlayerInput.setText("Black");
+        }
+        layout.addView(blackPlayerInput);
+
+        builder.setView(layout);
+
+        builder.setPositiveButton("Update", (dialog, which) -> {
+            String white = whitePlayerInput.getText().toString().trim();
+            String black = blackPlayerInput.getText().toString().trim();
+
+            if (white.isEmpty()) white = "White";
+            if (black.isEmpty()) black = "Black";
+
+            // Update UI
+            binding.whitePlayerNameLabel.setText("⚪ " + white);
+            binding.blackPlayerNameLabel.setText("⚫ " + black);
+
+            // Update ViewModel/Game object
+            ChessGame selected = viewModel.getSelectedGame().getValue();
+            if (selected == null) {
+                selected = new ChessGame();
+                selected.url = java.util.UUID.randomUUID().toString();
+                selected.whitePlayer = "White"; 
+                selected.blackPlayer = "Black";
+                viewModel.setSelectedGame(selected);
+            }
+            selected.whitePlayer = white;
+            selected.blackPlayer = black;
+            
+            // Note: We don't update the internal 'game' object's tags here because 
+            // the 'game' object is primarily for moves/board state. 
+            // The PGN generation might miss these tags if we don't set them, 
+            // but for now we rely on the ChessGame entity holding the names.
+            // Ideally, we should update game metadata too if supported.
+            
+            Toast.makeText(getContext(), "Info updated. Don't forget to Save Game.", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        builder.show();
     }
 
     private void updateBoardPosition(int targetMoveNumber) {

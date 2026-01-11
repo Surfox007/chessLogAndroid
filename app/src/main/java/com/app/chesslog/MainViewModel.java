@@ -95,13 +95,11 @@ public class MainViewModel extends AndroidViewModel {
             uciEngine.setOnInfoListener(info -> Log.d(TAG, "Engine Info: " + info));
             uciEngine.setOnErrorListener(error -> {
                 Log.e(TAG, "Engine Error: " + error);
-                engineAnalysis.postValue("Engine Error: " + error);
             });
             try {
                 uciEngine.start(enginePath);
             } catch (IOException e) {
                 Log.e(TAG, "Failed to start UCI Engine", e);
-                engineAnalysis.postValue("Engine startup failed: " + e.getMessage());
                 uciEngine = null; // Discard broken engine instance
             }
         }
@@ -153,17 +151,16 @@ public class MainViewModel extends AndroidViewModel {
                             engineMoveList.postValue(moves);
                         }
                     } else {
-                        engineAnalysis.postValue("API Error: " + stockfishResponse.getData());
+                        Log.e(TAG, "API Error: " + stockfishResponse.getData());
                     }
                 } else {
-                    engineAnalysis.postValue("API Call failed: " + response.code());
+                    Log.e(TAG, "API Call failed: " + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<StockfishResponse> call, Throwable t) {
                 Log.e(TAG, "Failed to analyze position online", t);
-                engineAnalysis.postValue("Network Error: " + t.getMessage());
             }
         });
     }
