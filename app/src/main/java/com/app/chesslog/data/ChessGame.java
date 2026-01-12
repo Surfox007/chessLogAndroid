@@ -12,4 +12,5 @@ public class ChessGame {
     public String pgn;
     public String whitePlayer;
     public String blackPlayer;
+    public String note;
 }

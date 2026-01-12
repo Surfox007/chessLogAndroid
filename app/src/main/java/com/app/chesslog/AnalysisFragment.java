@@ -224,6 +224,9 @@ public class AnalysisFragment extends Fragment {
             } else if (itemId == R.id.action_edit_game_info) {
                 showEditGameInfoDialog();
                 return true;
+            } else if (itemId == R.id.action_edit_notes) {
+                showEditNotesDialog();
+                return true;
             } else if (itemId == R.id.action_save_game) {
                 ChessGame selectedGame = viewModel.getSelectedGame().getValue();
                 if (selectedGame == null) {
@@ -243,6 +246,47 @@ public class AnalysisFragment extends Fragment {
             }
             return false;
         });
+    }
+
+    private void showEditNotesDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Game Notes");
+
+        final EditText input = new EditText(getContext());
+        input.setHint("Enter your notes here...");
+        input.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        input.setMinLines(5);
+        input.setPadding(32, 32, 32, 32);
+        
+        ChessGame selectedGame = viewModel.getSelectedGame().getValue();
+        if (selectedGame != null && selectedGame.note != null) {
+            input.setText(selectedGame.note);
+        }
+
+        builder.setView(input);
+
+        builder.setPositiveButton("Save", (dialog, which) -> {
+            String note = input.getText().toString();
+            
+            ChessGame gameToUpdate = viewModel.getSelectedGame().getValue();
+            if (gameToUpdate == null) {
+                gameToUpdate = new ChessGame();
+                gameToUpdate.url = java.util.UUID.randomUUID().toString();
+                gameToUpdate.whitePlayer = "White";
+                gameToUpdate.blackPlayer = "Black";
+                viewModel.setSelectedGame(gameToUpdate);
+            }
+            
+            gameToUpdate.note = note;
+            // Persist changes immediately
+            viewModel.insertGame(gameToUpdate);
+            Toast.makeText(getContext(), "Note saved!", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        builder.show();
     }
 
     private void showEditGameInfoDialog() {
